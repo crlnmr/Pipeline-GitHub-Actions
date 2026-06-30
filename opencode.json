@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "omniroute/gemini/gemini-2.5-flash",
+  "provider": {
+    "omniroute": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OmniRoute",
+      "options": {
+        "baseURL": "http://localhost:20128/v1",
+        "apiKey": "{env:OMNIROUTE_API_KEY}"
+      },
+      "models": {
+        "gemini/gemini-2.5-flash": {
+          "name": "Gemini 2.5 Flash"
+        },
+        "gemini/gemini-2.5-flash-lite": {
+          "name": "Gemini 2.5 Flash Lite"
+        },
+        "auto/best-coding": {
+          "name": "Auto Best Coding"
+        }
+      }
+    }
+  }
+}

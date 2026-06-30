@@ -1,0 +1,22 @@
+{
+  "name": "e-micro-commerce",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/frontend",
+    "apps/backend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "lint": "./node_modules/.bin/eslint \"apps/backend/{src,test}/**/*.ts\" \"apps/frontend/src/**/*.{ts,tsx}\" --fix",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace=frontend",
+    "prisma:migrate:dev": "npm run prisma:migrate:dev --workspace=backend"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "eslint": "^9.39.4",
+    "typescript-eslint": "^8.62.0"
+  }
+}

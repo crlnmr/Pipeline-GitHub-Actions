@@ -1,0 +1,15 @@
+node_modules
+.env
+dist
+.next
+coverage
+prisma/*.db
+# Playwright
+playwright-report/
+test-results/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

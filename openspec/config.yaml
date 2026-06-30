@@ -1,0 +1,151 @@
+schema: spec-driven
+
+context: |
+  ## Produto: e-micro-commerce
+  Plataforma de fluxo duplo para microempreendedores. Resolve o problema de
+  controle de pedidos e pagamentos que gera prejuízos diários.
+
+  ### Perfis de Usuário
+  - **ADMIN**: empreendedor que gerencia categorias, produtos, clientes, pedidos
+    e registra pagamentos manualmente. Visualiza dashboard financeiro.
+  - **CUSTOMER**: cliente que navega na vitrine, cria e acompanha seus próprios
+    pedidos, e pode cancelar pedidos não pagos.
+  - **Público**: qualquer visitante pode consultar o catálogo sem autenticação.
+
+  ### Domínio e Entidades
+  - **Categoria**: agrupa produtos (atributos: nome, ativo).
+  - **Produto**: item comercializado (atributos: nome, categoria, imagem,
+    descrição, preço, estoque, ativo). Produtos inativos não aparecem na vitrine.
+  - **Cliente**: pessoa que realiza pedidos (atributos: nome, endereço, e-mail,
+    telefone, ativo). Clientes com pedidos só podem ser desativados, não removidos.
+  - **Pedido**: compra realizada (atributos: número, cliente, endereço de entrega,
+    status, valor total calculado via soma de itens — não persistido).
+  - **ItemPedido**: linha do pedido (produto, preço unitário no momento da compra,
+    quantidade).
+  - **Pagamento**: registro financeiro de um pedido (valor, método, data, status,
+    observação). Um pagamento pertence a exatamente um pedido.
+
+  ### Fluxo de Estados do Pedido
+  Novo → Pago → Preparação → Faturado → Despachado → Entregue
+  Qualquer estado (exceto Entregue) → Cancelado
+  - Pedido cancelado não pode retornar ao fluxo.
+  - Apenas ADMIN registra pagamentos.
+  - Toda mudança de status deve ser auditada.
+
+  ### Stack Tecnológica
+  **Monorepo npm Workspaces**
+  ```
+  apps/
+   ├── frontend/  # Next.js 16+ · App Router · TypeScript · Vanilla CSS · Pino
+   └── backend/   # NestJS 11+ · TypeScript · Prisma 7+ · PostgreSQL 15+
+                  # nestjs-pino · OpenTelemetry
+  infra/          # Terraform
+  docs/
+  .env            # único arquivo de ambiente na raiz
+  ```
+
+  **Autenticação (padrão BFF obrigatório)**
+  - Provedor: Clerk.
+  - Fluxo: Frontend (formulários próprios) → Backend NestJS → Clerk API.
+  - Roles armazenadas no Clerk; Guards/Decorators do NestJS protegem recursos.
+  - Proibido no frontend: SDKs oficiais do Clerk, componentes SignIn/SignUp/
+    UserProfile/UserButton ou equivalentes.
+
+  **Backend**
+  - Estrutura de módulos: core/ (auth, database, observability, audit) +
+    modules/ (catalog, orders, customers).
+  - Toda regra de negócio reside exclusivamente no backend NestJS.
+  - APIs RESTful versionadas: base URL https://api.dominio.com/v1
+  - Paginação obrigatória em coleções; filtros e ordenação quando aplicáveis.
+  - Erros seguem RFC 9457 Problem Details:
+    { type, title, status, detail, instance }
+  - DTOs com class-validator; SOLID + Clean Architecture.
+  - Prisma como única forma de acesso ao banco (raw queries proibidas).
+  - Transações Prisma para operações atômicas.
+  - Rate limiting: 100 req/min por IP, 1000 req/min por usuário autenticado.
+  - APIs decoradas com Swagger/OpenAPI.
+
+  **Frontend**
+  - Páginas não contêm regras de negócio.
+  - Integração com APIs exclusivamente via camada services/.
+  - Server Actions usadas apenas como camada de transporte (sem regras de
+    negócio, sem acesso a banco, sem acesso ao Prisma).
+  - Componentes desacoplados da infraestrutura.
+
+  **Design System: Nike-design-analysis**
+  Estilo editorial minimalista. Paleta quase monocromática:
+  - Primary / ink: #111111 · Canvas: #ffffff · Soft-cloud: #f5f5f5
+  - Sale: #d30005 · Success: #007d48 · Info: #1151ff
+  - Tipografia: Nike Futura ND 96px (display) → Helvetica Now Display Medium
+    (headings 16–32px) → Helvetica Now Text (body/links). Substitutos open-source:
+    Bebas Neue (display) + Inter 400/500 (UI).
+  - Bordas: botões sempre pill (border-radius: 9999px); cards sempre flat (0px).
+  - Elevação: zero drop-shadow; apenas 1px hairline (#cacacb) como divisor.
+  - Espaçamento base 8px; seções com 48px de ritmo vertical.
+  - Todo novo componente deve seguir os tokens definidos no design.md.
+
+  **Observabilidade**
+  - Logging estruturado em JSON via Pino (backend e frontend).
+  - Proibido console.log em produção.
+  - Todo log deve conter: timestamp, level, correlationId, event, message.
+  - Eventos de domínio a registrar: user.registered, cart.updated,
+    order.created, order.cancelled, payment.approved, payment.failed.
+  - Toda requisição HTTP gera traces OpenTelemetry com trace_id, span_id, request_id.
+  - Plataforma de observabilidade: Grafana Cloud.
+  - Auditoria obrigatória em: alteração de preços, estoque, cancelamento de
+    pedidos, reembolsos, alteração de permissões.
+  - Formato de auditoria: { usuario, objeto, acao, payload, timestamp }.
+
+  **Testes e Qualidade**
+  | Categoria  | Ferramenta           |
+  |------------|----------------------|
+  | Lint       | ESLint               |
+  | Unitário   | Jest                 |
+  | Integração | Jest + Supertest     |
+  | E2E        | Playwright           |
+
+  Cobertura mínima: Backend 80% linhas / 80% branches.
+                    Frontend 70% linhas / 70% branches.
+  Critério de done: lint limpo + todos os testes passando + cobertura atingida.
+
+  **Infraestrutura**
+  - Containers compatíveis com OCI.
+  - Infra declarada via Terraform.
+  - CI/CD via GitHub Actions.
+  - PostgreSQL local via Docker Compose; produção via serviço gerenciado
+    (Supabase, AWS RDS — sem extensões específicas de fornecedor).
+
+  **Restrições de Escopo (MVP)**
+  - Sem multi-tenancy, sem tenant_id, sem abstração de tenancy.
+  - Sem gateway de pagamento (registro manual pelo ADMIN).
+  - Sem e-mail transacional, WhatsApp, mobile, relatórios PDF/Excel.
+
+rules:
+  proposal:
+    - Inclua sempre uma seção "Non-goals" explicitando o que está fora do escopo.
+    - Referencie os RFs e RNFs do prd.md afetados pela mudança.
+    - Identifique impacto em autenticação, autorização e observabilidade.
+    - Limite a proposta a 600 palavras; use listas e tabelas, não parágrafos longos.
+    - Proibido propor multi-tenancy, SDKs Clerk no frontend ou acesso direto ao banco pelo frontend.
+
+  spec:
+    - Toda spec de funcionalidade deve conter as seções: Contexto, Regras de Negócio, Entidades Envolvidas, Endpoints da API (método, rota, payload, resposta), Interfaces Gráficas afetadas.
+    - Regras de negócio devem ser listadas individualmente e numeradas (RN-01, RN-02...).
+    - Endpoints devem seguir o padrão REST versionado (/v1/recurso).
+    - Erros de API devem referenciar RFC 9457 Problem Details.
+    - Especificar quais papéis (ADMIN / CUSTOMER / Público) têm acesso a cada endpoint.
+
+  design:
+    - Todo artefato de design deve referenciar tokens do design system Nike-design-analysis (design.md).
+    - Usar cores pelos tokens (ink, canvas, soft-cloud, sale, success) — nunca valores hexadecimais soltos.
+    - Botões sempre pill (rounded.full); cards sempre flat (rounded.none).
+    - Não introduzir drop-shadow, gradiente decorativo ou nova cor sem justificativa explícita.
+    - Incluir comportamento responsivo para mobile (breakpoint 599px) e desktop (1440px).
+
+  tasks:
+    - Quebre em tarefas atômicas de no máximo 2 horas cada.
+    - Cada tarefa deve especificar: o que entregar, critérios de aceitação e se há testes obrigatórios.
+    - Tarefas de backend devem incluir: migration (se houver), service, controller, DTOs e testes unitários + integração.
+    - Tarefas de frontend devem incluir: componente, integração com services/, e teste de componente.
+    - A última tarefa de qualquer feature deve ser "Validação de cobertura e lint" (não opcional).
+    - Ordenar tarefas respeitando dependências: migrations → backend → frontend → E2E.
